@@ -1,12 +1,14 @@
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17 -Isrc
 
+PROJECT = Spruce
 BUILD_DIR = build
-TARGET = $(BUILD_DIR)/needle
+TARGET = $(BUILD_DIR)/$(PROJECT)
 SRC = src/main.cpp
-HEADERS = src/handler.hpp src/inbuilt.hpp
+HEADERS = $(wildcard src/*.hpp)
 
 all: $(TARGET)
+
 $(TARGET): $(SRC) $(HEADERS)
 	$(CXX) $(CXXFLAGS) -o $@ $(SRC)
 
