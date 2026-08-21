@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Wall -Wextra -std=c++17 -Isrc
+CXXFLAGS = -Wall -Wextra -std=c++20 -Isrc
 
 PROJECT = Spruce
 BUILD_DIR = build
