@@ -11,7 +11,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
-struct DNS_Header {
+struct dnsHeader {
     uint16_t id = 1234;
 
     bool qr = 1;
@@ -24,12 +24,12 @@ struct DNS_Header {
     uint8_t rcode = 0;
 
     uint16_t qdcount = 1;
-    uint16_t ancount = 0;
+    uint16_t ancount = 1;
     uint16_t nscount = 0;
     uint16_t arcount = 0;
 };
 
-inline std::array<uint8_t, 12> serialize(const DNS_Header &h) {
+inline std::array<uint8_t, 12> serialize(const dnsHeader &h) {
     uint16_t flags = (h.qr << 15) | (h.opcode << 11) | (h.aa << 10) | (h.tc << 9) | (h.rd << 8) | (h.ra << 7) | (h.z << 4) | (h.rcode << 0);
     std::array<uint8_t, 12> result;
     result[0] = h.id / 256;
@@ -73,7 +73,6 @@ inline std::vector<uint8_t> encodeQuestion(const std::string &domain, uint16_t q
     std::vector<uint8_t> result;
 
     std::vector<uint8_t> encodeName = encodeDomain(domain);
-
     result.insert(result.end(), encodeName.begin(), encodeName.end());
 
     result.push_back(qtype/256);
@@ -81,6 +80,31 @@ inline std::vector<uint8_t> encodeQuestion(const std::string &domain, uint16_t q
 
     result.push_back(qclass/256);
     result.push_back(qclass%256);
+
+    return result;
+}
+
+inline std::vector<uint8_t> encodeAnswer(const std::string &domain, uint16_t atype, uint16_t aclass, uint32_t ttl, const std::array<uint8_t,4> &ip) {
+    std::vector<uint8_t> result;
+    std::vector<uint8_t> encodeName = encodeDomain(domain);
+
+    result.insert(result.end(), encodeName.begin(), encodeName.end());
+
+    result.push_back(atype/256);
+    result.push_back(atype%256);
+
+    result.push_back(aclass/256);
+    result.push_back(aclass%256);
+
+    result.push_back((ttl >> 24) & 0xFF);
+    result.push_back((ttl >> 16) & 0xFF);
+    result.push_back((ttl >> 8) & 0xFF);
+    result.push_back(ttl & 0xFF);
+
+    result.push_back(0);
+    result.push_back(4);
+
+    result.insert(result.end(),ip.begin(),ip.end());
 
     return result;
 }

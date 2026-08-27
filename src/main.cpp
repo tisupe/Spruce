@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <cerrno>
@@ -11,9 +12,7 @@ int main() {
     cerr << unitbuf;
     setbuf(stdout, NULL);
 
-    struct sockaddr_in clientAddress;
     int udpSocket;
-
     udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
     if (udpSocket == -1) {
         cerr << "Socket creation failed: " << strerror(errno) << "..." << endl;
@@ -38,14 +37,19 @@ int main() {
 
     int bytesRead;
     char buffer[512];
+    struct sockaddr_in clientAddress;
     socklen_t clientAddrLen = sizeof(clientAddress);
 
-    DNS_Header header;
+    dnsHeader header;
+    array<uint8_t, 4> ip = {8,8,8,8};
     array<uint8_t, 12> headerBytes = serialize(header);
     vector<uint8_t> questionBytes = encodeQuestion("codecrafters.io", 1, 1);
+    vector<uint8_t> answerBytes = encodeAnswer("codecrafters.io", 1, 1, 60, ip);
+
     vector<uint8_t> response;
     response.insert(response.end(),headerBytes.begin(),headerBytes.end());
     response.insert(response.end(),questionBytes.begin(),questionBytes.end());
+    response.insert(response.end(),answerBytes.begin(),answerBytes.end());
 
     while (true) {
         // receiving
@@ -57,6 +61,9 @@ int main() {
 
         buffer[bytesRead] = '\0';
         cout << "Received " << bytesRead << " bytes: " << buffer << endl;
+
+        for (auto b : response) printf("%02x ", b);
+        printf("\n");
 
         // sending
         if (sendto(udpSocket, response.data(), response.size(), 0, reinterpret_cast<struct sockaddr*>(&clientAddress), sizeof(clientAddress)) == -1) {
