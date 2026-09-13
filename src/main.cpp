@@ -1,13 +1,16 @@
-#include <array>
+#include <arpa/inet.h>
 #include <cstdint>
 #include <cstring>
 #include <cerrno>
 #include <iostream>
-#include <vector>
+#include <netinet/in.h>
+#include <sstream>
+#include <string>
+#include <sys/socket.h>
 #include "handler.hpp"
 using namespace std;
 
-int main() {
+int main(int argc, char *argv[]) {
     cout << unitbuf;
     cerr << unitbuf;
     setbuf(stdout, NULL);
@@ -40,33 +43,52 @@ int main() {
     struct sockaddr_in clientAddress;
     socklen_t clientAddrLen = sizeof(clientAddress);
 
-    dnsHeader header;
-    array<uint8_t, 4> ip = {8,8,8,8};
-    array<uint8_t, 12> headerBytes = serialize(header);
-    vector<uint8_t> questionBytes = encodeQuestion("codecrafters.io", 1, 1);
-    vector<uint8_t> answerBytes = encodeAnswer("codecrafters.io", 1, 1, 60, ip);
+    stringstream ss(argv[2]);
+    string ipArg, portArg;
+    getline(ss, ipArg, ':');
+    getline(ss, portArg, ':');
+    int port = stoi(portArg);
 
-    vector<uint8_t> response;
-    response.insert(response.end(),headerBytes.begin(),headerBytes.end());
-    response.insert(response.end(),questionBytes.begin(),questionBytes.end());
-    response.insert(response.end(),answerBytes.begin(),answerBytes.end());
+    sockaddr_in resolverAddr;
+    resolverAddr.sin_family = AF_INET;
+    resolverAddr.sin_port = htons(port);
+    inet_pton(AF_INET, ipArg.c_str(), &resolverAddr.sin_addr);
+
+    char resolverResponse[512];
 
     while (true) {
-        // receiving
+        // receiving from client
         bytesRead = recvfrom(udpSocket, buffer, sizeof(buffer), 0, reinterpret_cast<struct sockaddr*>(&clientAddress), &clientAddrLen);
         if (bytesRead == -1) {
             perror("Error receiving data");
             break;
         }
 
-        buffer[bytesRead] = '\0';
-        cout << "Received " << bytesRead << " bytes: " << buffer << endl;
+        uint16_t qtype, qclass;
+        int endPos;
+        string domainName = parseQuestion(reinterpret_cast<uint8_t*>(buffer), 12, qtype, qclass, endPos);
+        cout << "Domain: " << domainName << ", Type: " << qtype << ", Class: " << qclass << ", endPos: " << endPos << endl;
 
-        for (auto b : response) printf("%02x ", b);
-        printf("\n");
+        // forward query to resolver
+        int forwardSocket = socket(AF_INET, SOCK_DGRAM, 0);
+        if (forwardSocket == -1) {
+            cerr << "Socket creation failed: " << strerror(errno) << "..." << endl;
+            return 1;
+        }
 
-        // sending
-        if (sendto(udpSocket, response.data(), response.size(), 0, reinterpret_cast<struct sockaddr*>(&clientAddress), sizeof(clientAddress)) == -1) {
+        if (sendto(forwardSocket, buffer, bytesRead, 0, reinterpret_cast<struct sockaddr*>(&resolverAddr), sizeof(resolverAddr)) == -1) {
+            perror("Failed to forward query");
+        }
+
+        int resolverBytesRead = recvfrom(forwardSocket, resolverResponse, sizeof(resolverResponse), 0, nullptr, nullptr);
+        if (resolverBytesRead == -1) {
+            perror("Error receiving data from resolver");
+            break;
+        }
+        close(forwardSocket);
+
+        // relay resolver's reply back to the original client
+        if (sendto(udpSocket, resolverResponse, resolverBytesRead, 0, reinterpret_cast<struct sockaddr*>(&clientAddress), sizeof(clientAddress)) == -1) {
             perror("Failed to send response");
         }
     }
