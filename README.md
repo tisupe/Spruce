@@ -21,3 +21,12 @@ A DNS server written in **C++**, built to understand the DNS protocol, UDP netwo
 
 ### Resolution
 - Forward queries to an upstream DNS server
+
+## Try it
+
+```sh
+git clone https://github.com/tisupe/Spurce
+cd Spurce
+make
+./build/Spurce
+```
