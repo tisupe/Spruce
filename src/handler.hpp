@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 
 struct dnsHeader {
-    uint16_t id = 1234;
+    uint16_t id = 0;
 
     bool qr = 1;
     uint8_t opcode = 0;
